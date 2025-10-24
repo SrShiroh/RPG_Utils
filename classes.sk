@@ -1,0 +1,412 @@
+# Gestiona clases, puntos y GUI de seleccion
+options:
+    prefix: &7[&aLevel Utils]&r
+    max-skill-points: 100
+
+
+# Evento: confirma carga del sistema de clases
+on load:
+    send "{@prefix} &aSistema de clases cargado correctamente." to console
+ 
+# Prepara datos de clase y puntos para un jugador
+function init_class_data(p: player):
+    set {_id} to "%uuid of {_p}%"
+    
+    if {rpg.class::%{_id}%} is not set:
+        set {rpg.class::%{_id}%} to "none"
+    
+    if {rpg.skillpoints::%{_id}%} is not set:
+        set {rpg.skillpoints::%{_id}%} to 0
+    
+    if {rpg.skill.guerrero::%{_id}%} is not set:
+        set {rpg.skill.guerrero::%{_id}%} to 0
+    if {rpg.skill.tanque::%{_id}%} is not set:
+        set {rpg.skill.tanque::%{_id}%} to 0
+    if {rpg.skill.mago::%{_id}%} is not set:
+        set {rpg.skill.mago::%{_id}%} to 0
+    if {rpg.skill.healer::%{_id}%} is not set:
+        set {rpg.skill.healer::%{_id}%} to 0
+    if {rpg.skill.arquero::%{_id}%} is not set:
+        set {rpg.skill.arquero::%{_id}%} to 0
+
+# Inicializa datos de clase al conectar
+on join:
+    init_class_data(player)
+
+
+# Otorga un punto de habilidad al jugador
+function give_skill_point(p: player):
+    set {_id} to "%uuid of {_p}%"
+    add 1 to {rpg.skillpoints::%{_id}%}
+    send "{@prefix} &a¡Has ganado &e1 Punto de Habilidad&a! &7(/rpgclass)" to {_p}
+    play sound "entity.player.levelup" with volume 0.5 and pitch 2 at {_p}
+
+
+# Comando principal para abrir la GUI de clases
+command /rpgclass:
+    aliases: /class, /clase
+    trigger:
+        open_class_gui(player)
+ 
+# Construye la interfaz de clases y controla interacciones
+function open_class_gui(p: player):
+    set {_id} to "%uuid of {_p}%"
+    set {_current_class} to {rpg.class::%{_id}%}
+    set {_points} to {rpg.skillpoints::%{_id}%}
+    
+    if {_current_class} is not set:
+        set {_current_class} to "none"
+    if {_points} is not set:
+        set {_points} to 0
+    
+    set {_guerrero} to {rpg.skill.guerrero::%{_id}%}
+    set {_tanque} to {rpg.skill.tanque::%{_id}%}
+    set {_mago} to {rpg.skill.mago::%{_id}%}
+    set {_healer} to {rpg.skill.healer::%{_id}%}
+    set {_arquero} to {rpg.skill.arquero::%{_id}%}
+    
+    if {_guerrero} is not set:
+        set {_guerrero} to 0
+    if {_tanque} is not set:
+        set {_tanque} to 0
+    if {_mago} is not set:
+        set {_mago} to 0
+    if {_healer} is not set:
+        set {_healer} to 0
+    if {_arquero} is not set:
+        set {_arquero} to 0
+    
+    set {_gui} to chest inventory with 3 rows named "&aMenú de clases"
+    
+    set {_info} to nether star named "&e⭐ Puntos Disponibles: &a%{_points}%"
+    set line 1 of lore of {_info} to "&7Obtienes 1 punto por cada nivel"
+    set line 2 of lore of {_info} to "&7Invierte puntos para mejorar tu clase"
+    set line 3 of lore of {_info} to ""
+    if {_current_class} is "none":
+        set line 4 of lore of {_info} to "&eClase: &cNo seleccionada"
+        set line 5 of lore of {_info} to "&7Elige una clase para comenzar"
+    else:
+        set line 4 of lore of {_info} to "&eClase Elegida: &a%{_current_class}%"
+        set line 5 of lore of {_info} to "&7Solo puedes mejorar esta clase"
+    set line 6 of lore of {_info} to ""
+    set line 7 of lore of {_info} to "&7Las bonificaciones se aplican"
+    set line 8 of lore of {_info} to "&7mediante armaduras específicas"
+    set slot 4 of {_gui} to {_info}
+    
+    set {_can_guerrero} to false
+    if {_current_class} is "none":
+        set {_can_guerrero} to true
+    if {_current_class} is "Guerrero":
+        set {_can_guerrero} to true
+
+    if {_can_guerrero} is true:
+        set {_warrior} to iron sword named "&c⚔ Guerrero &7[Nivel %{_guerrero}%]"
+        set line 1 of lore of {_warrior} to "&7Maestro del combate cuerpo a cuerpo"
+        set line 2 of lore of {_warrior} to ""
+        set line 3 of lore of {_warrior} to "&eEspecialización:"
+        set line 4 of lore of {_warrior} to "&7Daño mejorado y golpes críticos"
+        set line 5 of lore of {_warrior} to "&7Requiere armadura de Guerrero"
+        set line 6 of lore of {_warrior} to ""
+        if {_points} > 0:
+            set line 7 of lore of {_warrior} to "&a▶ Click para mejorar"
+        else:
+            set line 7 of lore of {_warrior} to "&c✖ Sin puntos disponibles"
+        set slot 11 of {_gui} to {_warrior}
+    else:
+        set {_warrior} to red stained glass pane named "&c⚔ Guerrero &8[BLOQUEADO]"
+        set line 1 of lore of {_warrior} to "&cNo puedes mejorar esta clase"
+        set line 2 of lore of {_warrior} to "&cYa elegiste: %{_current_class}%"
+        set slot 11 of {_gui} to {_warrior}
+    
+    set {_can_tanque} to false
+    if {_current_class} is "none":
+        set {_can_tanque} to true
+    if {_current_class} is "Tanque":
+        set {_can_tanque} to true
+    
+    if {_can_tanque} is true:
+        set {_tank} to shield named "&9🛡 Tanque &7[Nivel %{_tanque}%]"
+        set line 1 of lore of {_tank} to "&7Defensor resistente y protector"
+        set line 2 of lore of {_tank} to ""
+        set line 3 of lore of {_tank} to "&eEspecialización:"
+        set line 4 of lore of {_tank} to "&7Reducción de daño y vida extra"
+        set line 5 of lore of {_tank} to "&7Requiere armadura de Tanque"
+        set line 6 of lore of {_tank} to ""
+        if {_points} > 0:
+            set line 7 of lore of {_tank} to "&a▶ Click para mejorar"
+        else:
+            set line 7 of lore of {_tank} to "&c✖ Sin puntos disponibles"
+        set slot 12 of {_gui} to {_tank}
+    else:
+        set {_tank} to blue stained glass pane named "&9🛡 Tanque &8[BLOQUEADO]"
+        set line 1 of lore of {_tank} to "&cNo puedes mejorar esta clase"
+        set line 2 of lore of {_tank} to "&cYa elegiste: %{_current_class}%"
+        set slot 12 of {_gui} to {_tank}
+    
+    set {_can_mago} to false
+    if {_current_class} is "none":
+        set {_can_mago} to true
+    if {_current_class} is "Mago":
+        set {_can_mago} to true
+    
+    if {_can_mago} is true:
+        set {_mage} to blaze rod named "&5✨ Mago &7[Nivel %{_mago}%]"
+        set line 1 of lore of {_mage} to "&7Experto en magia y hechizos"
+        set line 2 of lore of {_mage} to ""
+        set line 3 of lore of {_mage} to "&eEspecialización:"
+        set line 4 of lore of {_mage} to "&7Daño mágico y reducción de maná"
+        set line 5 of lore of {_mage} to "&7Requiere armadura de Mago"
+        set line 6 of lore of {_mage} to ""
+        if {_points} > 0:
+            set line 7 of lore of {_mage} to "&a▶ Click para mejorar"
+        else:
+            set line 7 of lore of {_mage} to "&c✖ Sin puntos disponibles"
+        set slot 13 of {_gui} to {_mage}
+    else:
+        set {_mage} to purple stained glass pane named "&5✨ Mago &8[BLOQUEADO]"
+        set line 1 of lore of {_mage} to "&cNo puedes mejorar esta clase"
+        set line 2 of lore of {_mage} to "&cYa elegiste: %{_current_class}%"
+        set slot 13 of {_gui} to {_mage}
+    
+    set {_can_healer} to false
+    if {_current_class} is "none":
+        set {_can_healer} to true
+    if {_current_class} is "Healer":
+        set {_can_healer} to true
+    
+    if {_can_healer} is true:
+        set {_heal} to golden apple named "&a❤ Healer &7[Nivel %{_healer}%]"
+        set line 1 of lore of {_heal} to "&7Sanador y apoyo del equipo"
+        set line 2 of lore of {_heal} to ""
+        set line 3 of lore of {_heal} to "&eEspecialización:"
+        set line 4 of lore of {_heal} to "&7Curación potenciada y regeneración"
+        set line 5 of lore of {_heal} to "&7Requiere armadura de Healer"
+        set line 6 of lore of {_heal} to ""
+        if {_points} > 0:
+            set line 7 of lore of {_heal} to "&a▶ Click para mejorar"
+        else:
+            set line 7 of lore of {_heal} to "&c✖ Sin puntos disponibles"
+        set slot 14 of {_gui} to {_heal}
+    else:
+        set {_heal} to lime stained glass pane named "&a❤ Healer &8[BLOQUEADO]"
+        set line 1 of lore of {_heal} to "&cNo puedes mejorar esta clase"
+        set line 2 of lore of {_heal} to "&cYa elegiste: %{_current_class}%"
+        set slot 14 of {_gui} to {_heal}
+    
+    set {_can_arquero} to false
+    if {_current_class} is "none":
+        set {_can_arquero} to true
+    if {_current_class} is "Arquero":
+        set {_can_arquero} to true
+    
+    if {_can_arquero} is true:
+        set {_archer} to bow named "&e🏹 Arquero &7[Nivel %{_arquero}%]"
+        set line 1 of lore of {_archer} to "&7Experto en combate a distancia"
+        set line 2 of lore of {_archer} to ""
+        set line 3 of lore of {_archer} to "&eEspecialización:"
+        set line 4 of lore of {_archer} to "&7Daño con arco y flechas rápidas"
+        set line 5 of lore of {_archer} to "&7Requiere armadura de Arquero"
+        set line 6 of lore of {_archer} to ""
+        if {_points} > 0:
+            set line 7 of lore of {_archer} to "&a▶ Click para mejorar"
+        else:
+            set line 7 of lore of {_archer} to "&c✖ Sin puntos disponibles"
+        set slot 15 of {_gui} to {_archer}
+    else:
+        set {_archer} to yellow stained glass pane named "&e🏹 Arquero &8[BLOQUEADO]"
+        set line 1 of lore of {_archer} to "&cNo puedes mejorar esta clase"
+        set line 2 of lore of {_archer} to "&cYa elegiste: %{_current_class}%"
+        set slot 15 of {_gui} to {_archer}
+    
+    set {_reset} to barrier named "&c⟲ Resetear Habilidades"
+    set line 1 of lore of {_reset} to "&7Devuelve todos los puntos gastados"
+    set line 2 of lore of {_reset} to "&7y te permite elegir otra clase"
+    set line 3 of lore of {_reset} to ""
+    set line 4 of lore of {_reset} to "&c⚠ Esta acción es irreversible"
+    set slot 22 of {_gui} to {_reset}
+    
+    open {_gui} to {_p}
+  
+  
+# Gestiona clicks dentro de la GUI de clases
+on inventory click:
+    name of player's current inventory is "&aMenú de clases"
+    
+    cancel event
+    
+    if click type is not left mouse button:
+        stop
+    
+    if index of event-slot is not 11 or 12 or 14 or 15 or 22:
+        stop
+    
+    set {_id} to "%uuid of player%"
+    set {_points} to {rpg.skillpoints::%{_id}%}
+    set {_current_class} to {rpg.class::%{_id}%}
+    
+    if {_points} is not set:
+        set {_points} to 0
+    if {_current_class} is not set:
+        set {_current_class} to "none"
+    
+    if index of event-slot is 11:
+        set {_can_improve} to false
+        if {_current_class} is "none":
+            set {_can_improve} to true
+        if {_current_class} is "Guerrero":
+            set {_can_improve} to true
+        
+        if {_can_improve} is true:
+            if {_points} > 0:
+                add 1 to {rpg.skill.guerrero::%{_id}%}
+                remove 1 from {rpg.skillpoints::%{_id}%}
+                set {rpg.class::%{_id}%} to "Guerrero"
+                send "{@prefix} &a¡Has mejorado &cGuerrero &aa nivel &e%{rpg.skill.guerrero::%{_id}%}%&a!" to player
+                play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.5 at player
+                close player's inventory
+                wait 2 ticks
+                open_class_gui(player)
+            else:
+                send action bar "&c✖ No tienes puntos disponibles" to player
+                play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+        else:
+            send action bar "&c✖ Ya elegiste la clase %{_current_class}%" to player
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+    
+    else if index of event-slot is 12:
+        set {_can_improve} to false
+        if {_current_class} is "none":
+            set {_can_improve} to true
+        if {_current_class} is "Tanque":
+            set {_can_improve} to true
+        
+        if {_can_improve} is true:
+            if {_points} > 0:
+                add 1 to {rpg.skill.tanque::%{_id}%}
+                remove 1 from {rpg.skillpoints::%{_id}%}
+                set {rpg.class::%{_id}%} to "Tanque"
+                send "{@prefix} &a¡Has mejorado &9Tanque &aa nivel &e%{rpg.skill.tanque::%{_id}%}%&a!" to player
+                play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.5 at player
+                close player's inventory
+                wait 2 ticks
+                open_class_gui(player)
+            else:
+                send action bar "&c✖ No tienes puntos disponibles" to player
+                play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+        else:
+            send action bar "&c✖ Ya elegiste la clase %{_current_class}%" to player
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+    
+    else if index of event-slot is 13:
+        set {_can_improve} to false
+        if {_current_class} is "none":
+            set {_can_improve} to true
+        if {_current_class} is "Mago":
+            set {_can_improve} to true
+        
+        if {_can_improve} is true:
+            if {_points} > 0:
+                add 1 to {rpg.skill.mago::%{_id}%}
+                remove 1 from {rpg.skillpoints::%{_id}%}
+                set {rpg.class::%{_id}%} to "Mago"
+                send "{@prefix} &a¡Has mejorado &5Mago &aa nivel &e%{rpg.skill.mago::%{_id}%}%&a!" to player
+                play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.5 at player
+                close player's inventory
+                wait 2 ticks
+                open_class_gui(player)
+            else:
+                send action bar "&c✖ No tienes puntos disponibles" to player
+                play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+        else:
+            send action bar "&c✖ Ya elegiste la clase %{_current_class}%" to player
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+    
+    else if index of event-slot is 14:
+        set {_can_improve} to false
+        if {_current_class} is "none":
+            set {_can_improve} to true
+        if {_current_class} is "Healer":
+            set {_can_improve} to true
+        
+        if {_can_improve} is true:
+            if {_points} > 0:
+                add 1 to {rpg.skill.healer::%{_id}%}
+                remove 1 from {rpg.skillpoints::%{_id}%}
+                set {rpg.class::%{_id}%} to "Healer"
+                send "{@prefix} &a¡Has mejorado &aHealer &aa nivel &e%{rpg.skill.healer::%{_id}%}%&a!" to player
+                play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.5 at player
+                close player's inventory
+                wait 2 ticks
+                open_class_gui(player)
+            else:
+                send action bar "&c✖ No tienes puntos disponibles" to player
+                play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+        else:
+            send action bar "&c✖ Ya elegiste la clase %{_current_class}%" to player
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+    
+    else if index of event-slot is 15:
+        set {_can_improve} to false
+        if {_current_class} is "none":
+            set {_can_improve} to true
+        if {_current_class} is "Arquero":
+            set {_can_improve} to true
+        
+        if {_can_improve} is true:
+            if {_points} > 0:
+                add 1 to {rpg.skill.arquero::%{_id}%}
+                remove 1 from {rpg.skillpoints::%{_id}%}
+                set {rpg.class::%{_id}%} to "Arquero"
+                send "{@prefix} &a¡Has mejorado &eArquero &aa nivel &e%{rpg.skill.arquero::%{_id}%}%&a!" to player
+                play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.5 at player
+                close player's inventory
+                wait 2 ticks
+                open_class_gui(player)
+            else:
+                send action bar "&c✖ No tienes puntos disponibles" to player
+                play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+        else:
+            send action bar "&c✖ Ya elegiste la clase %{_current_class}%" to player
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at player
+    
+    else if index of event-slot is 22:
+        reset_skills(player)
+        close player's inventory
+        wait 2 ticks
+        open_class_gui(player)
+  
+# Evita que se modifique la GUI arrastrando objetos
+on inventory drag:
+    name of player's current inventory is "&a&lMenú de clases"
+    cancel event
+  
+# Evita que cambien objetos mientras la GUI esta abierta
+on swap hand items:
+    name of player's current inventory is "&a&lMenú de clases"
+    cancel event
+  
+  
+# Restaura habilidades y puntos de clase de un jugador
+function reset_skills(p: player):
+    set {_id} to "%uuid of {_p}%"
+    
+    set {_total} to 0
+    add {rpg.skill.guerrero::%{_id}%} to {_total}
+    add {rpg.skill.tanque::%{_id}%} to {_total}
+    add {rpg.skill.mago::%{_id}%} to {_total}
+    add {rpg.skill.healer::%{_id}%} to {_total}
+    add {rpg.skill.arquero::%{_id}%} to {_total}
+    
+    set {rpg.skill.guerrero::%{_id}%} to 0
+    set {rpg.skill.tanque::%{_id}%} to 0
+    set {rpg.skill.mago::%{_id}%} to 0
+    set {rpg.skill.healer::%{_id}%} to 0
+    set {rpg.skill.arquero::%{_id}%} to 0
+    
+    add {_total} to {rpg.skillpoints::%{_id}%}
+    
+    set {rpg.class::%{_id}%} to "none"
+    
+    send "{@prefix} &aHabilidades reseteadas. &e%{_total}% puntos &adevueltos." to {_p}
+    send "{@prefix} &7Ahora puedes elegir una nueva clase." to {_p}
+    play sound "block.anvil.use" with volume 0.8 and pitch 1 at {_p}

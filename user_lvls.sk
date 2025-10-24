@@ -1,0 +1,259 @@
+# Gestiona XP, niveles y barras para jugadores
+options:
+    rpg-max-level: 50
+    xp-normal: 10
+    xp-rare: 25
+    xp-epic: 75
+    xp-miniboss: 150
+    xp-boss: 500
+    xp-coal: 0.5
+    xp-copper: 0.5
+    xp-iron: 1
+    xp-gold: 2
+    xp-redstone: 1
+    xp-lapis: 2
+    xp-diamond: 10
+    xp-emerald: 12
+    xp-ancient-debris: 20
+    xp-nether-quartz: 1.5
+    levelup-sound: entity.player.levelup
+    prefix: &7[&aLevel Utils&7]&r
+
+
+# Eventos de Bukkit usados para XP
+import:
+    org.bukkit.event.player.PlayerExpChangeEvent
+    org.bukkit.event.entity.EntityDeathEvent
+    org.bukkit.event.entity.EntitySpawnEvent
+    org.bukkit.entity.Player
+    org.bukkit.entity.LivingEntity
+    org.bukkit.entity.ExperienceOrb
+
+
+# Prepara tablas de XP y listas de mobs
+on load:
+    clear {rpg.mobs.normal::*}
+    add "zombie" to {rpg.mobs.normal::*}
+
+    clear {rpg.mobs.rare::*}
+    add "enderman" to {rpg.mobs.rare::*}
+
+    clear {rpg.mobs.epic::*}
+    add "wither_skeleton" to {rpg.mobs.epic::*}
+
+    set {rpg.ore.xp::coal ore} to {@xp-coal}
+    set {rpg.ore.xp::deepslate coal ore} to {@xp-coal}
+    set {rpg.ore.xp::copper ore} to {@xp-copper}
+    set {rpg.ore.xp::deepslate copper ore} to {@xp-copper}
+    set {rpg.ore.xp::iron ore} to {@xp-iron}
+    set {rpg.ore.xp::deepslate iron ore} to {@xp-iron}
+    set {rpg.ore.xp::gold ore} to {@xp-gold}
+    set {rpg.ore.xp::deepslate gold ore} to {@xp-gold}
+    set {rpg.ore.xp::nether gold ore} to {@xp-gold}
+    set {rpg.ore.xp::redstone ore} to {@xp-redstone}
+    set {rpg.ore.xp::deepslate redstone ore} to {@xp-redstone}
+    set {rpg.ore.xp::lapis ore} to {@xp-lapis}
+    set {rpg.ore.xp::deepslate lapis ore} to {@xp-lapis}
+    set {rpg.ore.xp::diamond ore} to {@xp-diamond}
+    set {rpg.ore.xp::deepslate diamond ore} to {@xp-diamond}
+    set {rpg.ore.xp::emerald ore} to {@xp-emerald}
+    set {rpg.ore.xp::deepslate emerald ore} to {@xp-emerald}
+    set {rpg.ore.xp::ancient debris} to {@xp-ancient-debris}
+    set {rpg.ore.xp::nether quartz ore} to {@xp-nether-quartz}
+
+    set {rpg.maxLevel} to {@rpg-max-level}
+    send "{@prefix} &aSistema de niveles de jugador cargado correctamente." to console
+
+  
+# Bloquea la experiencia vanilla
+on PlayerExpChangeEvent:
+    event.setAmount(0)
+  
+# Evita que aparezcan orbes de experiencia nativos
+on EntitySpawnEvent:
+    set {_entity} to event.getEntity()
+    if {_entity} is instance of ExperienceOrb:
+        event.setCancelled(true)
+
+  
+# Otorga experiencia segun el bloque minado
+on mine:
+    set {_block} to event-block
+    set {_player} to player
+    set {_type} to "%type of {_block}%"
+    set {_type} to lowercase {_type}
+    
+    if {rpg.ore.xp::%{_type}%} is set:
+        set {_xp} to {rpg.ore.xp::%{_type}%}
+        rpg_add_xp({_player}, {_xp})
+        send action bar "&a+%{_xp}% XP" to {_player}
+        play sound "entity.experience_orb.pickup" with volume 0.1 and pitch 1 at {_player}
+
+  
+# Calcula experiencia personalizada por muerte de mobs
+on EntityDeathEvent:
+    event.setDroppedExp(0)
+    
+    set {_entity} to event.getEntity()
+    
+    if {_entity} is instance of LivingEntity:
+        set {_living} to {_entity}
+        set {_killer} to {_living}.getKiller()
+        
+        if {_killer} is set:
+            if {_killer} is instance of Player:
+                set {_gain} to rpg_xp_for({_entity})
+                
+                if {_gain} > 0:
+                    rpg_add_xp({_killer}, {_gain})
+                    send action bar "&a+%{_gain}% XP" to {_killer}
+                    play sound "entity.experience_orb.pickup" with volume 0.1 and pitch 1 at {_killer}
+
+  
+# Prepara datos basicos para el jugador
+function rpg_init(p: player):
+    set {_id} to "%uuid of {_p}%"
+    if {rpg.level::%{_id}%} is not set:
+        set {rpg.level::%{_id}%} to 1
+    if {rpg.xp::%{_id}%} is not set:
+        set {rpg.xp::%{_id}%} to 0
+    rpg_update_bar({_p})
+  
+# Inicializa datos cuando el jugador entra
+on join:
+    rpg_init(player)
+
+  
+# Calcula la experiencia necesaria para subir de nivel
+function xpRequired(l: number) :: number:
+    set {_req} to 50 + (25 * {_l}) + (10 * {_l} * {_l})
+    return floor({_req})
+
+  
+# Sincroniza nivel y barra de experiencia visual
+function rpg_update_bar(p: player):
+    set {_id} to "%uuid of {_p}%"
+    set {_lvl} to {rpg.level::%{_id}%}
+    set {_xp} to {rpg.xp::%{_id}%}
+    if {_lvl} is not set:
+        set {_lvl} to 1
+        set {rpg.level::%{_id}%} to 1
+    if {_xp} is not set:
+        set {_xp} to 0
+        set {rpg.xp::%{_id}%} to 0
+
+    set {_need} to xpRequired({_lvl})
+    if {_need} <= 0:
+        set {_need} to 1
+
+    set {_progress} to {_xp} / {_need}
+    if {_progress} > 0.999:
+        set {_progress} to 0.999
+    if {_progress} < 0:
+        set {_progress} to 0
+
+    set level of {_p} to {_lvl}
+    set level progress of {_p} to {_progress}
+
+  
+# Anade experiencia y maneja subidas de nivel
+function rpg_add_xp(p: player, amt: number):
+    set {_id} to "%uuid of {_p}%"
+    if {rpg.level::%{_id}%} is not set:
+        set {rpg.level::%{_id}%} to 1
+    if {rpg.xp::%{_id}%} is not set:
+        set {rpg.xp::%{_id}%} to 0
+
+    if {_amt} > 0:
+        set {_lvl} to {rpg.level::%{_id}%}
+        set {_xp} to {rpg.xp::%{_id}%} + {_amt}
+
+        loop 250 times:
+            set {_need_} to xpRequired({_lvl})
+            if {_xp} >= {_need_}:
+                remove {_need_} from {_xp}
+                add 1 to {_lvl}
+
+                if {_lvl} >= {rpg.maxLevel}:
+                    set {_lvl} to {rpg.maxLevel}
+                    set {_need_} to xpRequired({_lvl})
+                    if {_need_} <= 0:
+                        set {_need_} to 1
+                    set {_xp} to {_need_} - 1
+                    stop loop
+
+                play sound "item.totem.use" with volume 1 and pitch 1 at {_p}
+                send "{@prefix} &a¡Has subido a nivel &e%{_lvl}%&a!" to {_p}
+                send action bar "&6&l¡NIVEL %{_lvl}%!" to {_p}
+                
+                give_skill_point({_p})
+            else:
+                stop loop
+
+        set {rpg.level::%{_id}%} to {_lvl}
+        set {rpg.xp::%{_id}%} to max({_xp}, 0)
+
+    rpg_update_bar({_p})
+
+  
+# Reduce experiencia evitando valores negativos
+function rpg_remove_xp(p: player, amt: number):
+    set {_id} to "%uuid of {_p}%"
+    if {rpg.level::%{_id}%} is not set:
+        set {rpg.level::%{_id}%} to 1
+    if {rpg.xp::%{_id}%} is not set:
+        set {rpg.xp::%{_id}%} to 0
+
+    if {_amt} > 0:
+        set {_lvl} to {rpg.level::%{_id}%}
+        set {_xp} to {rpg.xp::%{_id}%} - {_amt}
+
+        loop 250 times:
+            if {_xp} < 0:
+                if {_lvl} > 1:
+                    remove 1 from {_lvl}
+                    set {_need_prev} to xpRequired({_lvl})
+                    add {_need_prev} to {_xp}
+                else:
+                    set {_xp} to 0
+                    stop loop
+            else:
+                stop loop
+
+        set {rpg.level::%{_id}%} to {_lvl}
+        set {rpg.xp::%{_id}%} to max({_xp}, 0)
+
+    rpg_update_bar({_p})
+
+  
+# Determina cuantos puntos de experiencia otorga una entidad
+function rpg_xp_for(v: object) :: number:
+    set {_entity} to {_v}
+    
+    set {_customName} to {_entity}.getCustomName()
+    if {_customName} is set:
+        set {_n} to "%{_customName}%"
+        loop {rpg.mobs.boss.names::*}:
+            if {_n} contains loop-value:
+                return {@xp-boss}
+        loop {rpg.mobs.miniboss.names::*}:
+            if {_n} contains loop-value:
+                return {@xp-miniboss}
+
+    set {_type} to {_entity}.getType()
+    set {_t} to "%{_type}%"
+    set {_t} to lowercase {_t}
+    
+    loop {rpg.mobs.normal::*}:
+        if {_t} is loop-value:
+            return {@xp-normal}
+    
+    loop {rpg.mobs.rare::*}:
+        if {_t} is loop-value:
+            return {@xp-rare}
+    
+    loop {rpg.mobs.epic::*}:
+        if {_t} is loop-value:
+            return {@xp-epic}
+    
+    return 0

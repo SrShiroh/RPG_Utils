@@ -1,0 +1,271 @@
+# manejo de niveles y calidades de armas personalizadas
+options:
+    min-level: 1
+    max-level: 19
+    damage-increase-per-level: 0.18
+    prefix: &7[&aLevel Utils&7]&r
+
+
+# Inicializa calidades y sincroniza inventarios
+on load:
+    clear {rpg.weapon.quality::*}
+    
+    set {rpg.weapon.quality::hierro} to "&7Hierro"
+    set {rpg.weapon.damage::hierro} to 8
+    
+    set {rpg.weapon.quality::acero} to "&9Acero"
+    set {rpg.weapon.damage::acero} to 12
+    
+    set {rpg.weapon.quality::mitril} to "&5Mitril"
+    set {rpg.weapon.damage::mitril} to 18
+    
+    set {rpg.weapon.quality::obsidiana} to "&x&4&A&1&D&8&0Obsidiana"
+    set {rpg.weapon.damage::obsidiana} to 25
+    
+    send "{@prefix} &aSistema de armas personalizadas cargado correctamente." to console
+
+    wait 2 ticks
+    loop all players:
+        update_player_weapons(loop-player)
+
+    send "{@prefix} &eArmas de todos los jugadores conectados actualizadas." to console
+
+# Obtiene el nivel indicado en el lore del arma
+function get_weapon_level(item: item) :: number:
+    if lore of {_item} is not set:
+        return 0
+    
+    loop lore of {_item}:
+        if loop-value contains "Nivel Requerido:":
+            set {_line} to uncolored loop-value
+            replace all "✦ Nivel Requerido: " with "" in {_line}
+            set {_level} to {_line} parsed as number
+            if {_level} is set:
+                return {_level}
+    return 0
+  
+# Detecta la calidad segun el nombre del item
+function get_weapon_quality(item: item) :: text:
+    if name of {_item} is not set:
+        return "none"
+    
+    set {_name} to uncolored name of {_item}
+    
+    if {_name} contains "HIERRO":
+        return "hierro"
+    if {_name} contains "ACERO":
+        return "acero"
+    if {_name} contains "MITRIL":
+        return "mitril"
+    if {_name} contains "OBSIDIANA":
+        return "obsidiana"
+    
+    return "none"
+  
+# Recupera propietario desde el lore legendario
+function get_weapon_owner(item: item) :: text:
+    if lore of {_item} is not set:
+        return "none"
+    
+    loop lore of {_item}:
+        if loop-value contains "Propietario:":
+            set {_line} to uncolored loop-value
+            replace all "Propietario: " with "" in {_line}
+            return {_line}
+    return "none"
+  
+# Calcula el daño final segun base y nivel
+function calculate_weapon_damage(quality: text, level: number) :: number:
+    set {_base} to {rpg.weapon.damage::%{_quality}%}
+    if {_base} is not set:
+        set {_base} to 5
+    
+    set {_multiplier} to 1 + (({_level} - 1) * {@damage-increase-per-level})
+    set {_total} to {_base} * {_multiplier}
+    
+    return {_total}
+  
+# Reescribe nombre y lore de un arma segun calidad
+function update_weapon_lore(weapon: item, quality: text, level: number) :: item:
+    set {_quality_name} to {rpg.weapon.quality::%{_quality}%}
+    
+    set {_damage} to calculate_weapon_damage({_quality}, {_level})
+    set {_damage_rounded} to rounded {_damage}
+    set {_attack_speed} to 1.6
+    
+    set {_owner} to "none"
+    if {_quality} is "obsidiana":
+        if lore of {_weapon} is set:
+            set {_owner_line} to line 2 of lore of {_weapon}
+            set {_owner_line} to uncolored {_owner_line}
+            if {_owner_line} contains "Propietario: ":
+                replace all "Propietario: " with "" in {_owner_line}
+                set {_owner} to {_owner_line}
+            else:
+                set {_owner} to "Unknown"
+        else:
+            set {_owner} to "Unknown"
+    
+    clear lore of {_weapon}
+    
+    if {_quality} is "hierro":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&8&C&8&C&8&CHierro &7| [&a%{_level}%&7]"
+    else if {_quality} is "acero":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&5&D&A&D&E&2Acero &7| [&a%{_level}%&7]"
+    else if {_quality} is "mitril":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&A&F&7&A&C&5Mitril &7| [&a%{_level}%&7]"
+    else if {_quality} is "obsidiana":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&4&A&1&D&8&0Obsidiana &7| [&a%{_level}%&7]"
+    
+    if {_quality} is "hierro":
+        set line 1 of lore of {_weapon} to "&8&m                                   "
+        set line 2 of lore of {_weapon} to "&7Nivel: &f%{_level}% &7│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&8&m                                   "
+    else if {_quality} is "acero":
+        set line 1 of lore of {_weapon} to "&9&m                                   "
+        set line 2 of lore of {_weapon} to "&bNivel: &f%{_level}% &b│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&9&m                                   "
+    else if {_quality} is "mitril":
+        set line 1 of lore of {_weapon} to "&5&m                                   "
+        set line 2 of lore of {_weapon} to "&dNivel: &f%{_level}% &d│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&5&m                                   "
+    else if {_quality} is "obsidiana":
+        set line 1 of lore of {_weapon} to "&x&F&F&6&B&0&0&m                                   "
+        set line 2 of lore of {_weapon} to "&x&F&F&6&B&0&0Propietario: &f%{_owner}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&x&F&F&6&B&0&0Nivel: &f%{_level}% &x&F&F&6&B&0&0│ Calidad: %{_quality_name}%"
+        set line 5 of lore of {_weapon} to ""
+        set line 6 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 7 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 8 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 9 of lore of {_weapon} to "&x&F&F&6&B&0&0&m                                   "
+    
+    return {_weapon}
+  
+# Sincroniza armas del inventario con los valores actuales
+function update_player_weapons(p: player):
+    set {_updated_count} to 0
+    
+    loop 41 times:
+        set {_slot} to loop-number - 1
+        set {_item} to slot {_slot} of {_p}'s inventory
+        if {_item} is not air:
+            set {_quality} to get_weapon_quality({_item})
+            if {_quality} is not "none":
+                set {_level} to get_weapon_level({_item})
+                if {_level} > 0:
+                    set {_updated} to update_weapon_lore({_item}, {_quality}, {_level})
+                    set slot {_slot} of {_p}'s inventory to {_updated}
+                    add 1 to {_updated_count}
+  
+# Construye un arma nueva con lore y atributos
+function create_weapon(quality: text, level: number, base_item: material, owner: player) :: item:
+    set {_weapon} to {_base_item}
+    
+    set {_quality_name} to {rpg.weapon.quality::%{_quality}%}
+    
+    set {_damage} to calculate_weapon_damage({_quality}, {_level})
+    set {_damage_rounded} to rounded {_damage}
+    set {_attack_speed} to 1.6
+    
+    if {_quality} is "hierro":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&8&C&8&C&8&CHierro &7| [&a%{_level}%&7]"
+    else if {_quality} is "acero":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&5&D&A&D&E&2Acero &7| [&a%{_level}%&7]"
+    else if {_quality} is "mitril":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&A&F&7&A&C&5Mitril &7| [&a%{_level}%&7]"
+    else if {_quality} is "obsidiana":
+        set name of {_weapon} to "&7[&c🗡&7] Espada de &x&4&A&1&D&8&0Obsidiana &7| [&a%{_level}%&7]"
+    
+    if {_quality} is "hierro":
+        set line 1 of lore of {_weapon} to "&8&m                                   "
+        set line 2 of lore of {_weapon} to "&7Nivel: &f%{_level}% &7│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&8&m                                   "
+    else if {_quality} is "acero":
+        set line 1 of lore of {_weapon} to "&9&m                                   "
+        set line 2 of lore of {_weapon} to "&bNivel: &f%{_level}% &b│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&9&m                                   "
+    else if {_quality} is "mitril":
+        set line 1 of lore of {_weapon} to "&5&m                                   "
+        set line 2 of lore of {_weapon} to "&dNivel: &f%{_level}% &d│ Calidad: %{_quality_name}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 5 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 6 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 7 of lore of {_weapon} to "&5&m                                   "
+    else if {_quality} is "obsidiana":
+        set line 1 of lore of {_weapon} to "&x&F&F&6&B&0&0&m                                   "
+        set line 2 of lore of {_weapon} to "&x&F&F&6&B&0&0Propietario: &f%{_owner}%"
+        set line 3 of lore of {_weapon} to ""
+        set line 4 of lore of {_weapon} to "&x&F&F&6&B&0&0Nivel: &f%{_level}% &x&F&F&6&B&0&0│ Calidad: %{_quality_name}%"
+        set line 5 of lore of {_weapon} to ""
+        set line 6 of lore of {_weapon} to "&c⚔ &7Daño: &c%{_damage_rounded}% ❤"
+        set line 7 of lore of {_weapon} to "&a⚡ &7Velocidad: &a%{_attack_speed}%"
+        set line 8 of lore of {_weapon} to "&e✦ &7Nivel Requerido: &e%{_level}%"
+        set line 9 of lore of {_weapon} to "&x&F&F&6&B&0&0&m                                   "
+    
+    return {_weapon}
+
+  
+# Evita perder durabilidad en armas (Porque me da pereza meterle unbreakeable a items xd)
+on item damage:
+    set {_quality} to get_weapon_quality(event-item)
+    if {_quality} is not "none":
+        cancel event
+  
+# Controla daño y requisitos antes de aplicarlo
+on damage:
+    attacker is a player
+    set {_weapon} to attacker's tool
+    
+    set {_weapon_level} to get_weapon_level({_weapon})
+    if {_weapon_level} > 0:
+        set {_quality} to get_weapon_quality({_weapon})
+        
+        if {_quality} is "obsidiana":
+            set {_owner} to get_weapon_owner({_weapon})
+            if {_owner} is not "none":
+                if {_owner} is not "%attacker%":
+                    cancel event
+                    send action bar "&c¡Esta arma pertenece a %{_owner}%!" to attacker
+                    play sound "entity.villager.no" with volume 0.5 and pitch 1 at attacker
+                    stop
+        
+        set {_player_level} to {rpg.level::%uuid of attacker%}
+        if {_player_level} is not set:
+            set {_player_level} to 1
+        
+        if {_player_level} < {_weapon_level}:
+            cancel event
+            send action bar "&cNecesitas nivel %{_weapon_level}% para usar este arma (Nivel actual: %{_player_level}%)" to attacker
+            play sound "entity.villager.no" with volume 0.5 and pitch 1 at attacker
+            stop
+        
+        if {_quality} is not "none":
+            set {_damage} to calculate_weapon_damage({_quality}, {_weapon_level})
+            set damage to {_damage}
+  
+# Actualiza armas del jugador al conectarse
+on join:
+    wait 1 second
+    update_player_weapons(player)

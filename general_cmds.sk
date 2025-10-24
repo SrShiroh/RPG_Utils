@@ -1,0 +1,283 @@
+# Comandos de niveles, armas y clases
+options:
+    prefix: &7[&aLevel Utils&7]&r
+
+
+# Muestra nivel y progreso del jugador
+command /rpg:
+    aliases: /stats
+    trigger:
+        set {_id} to "%uuid of player%"
+        set {_lvl} to {rpg.level::%{_id}%}
+        set {_xp} to {rpg.xp::%{_id}%}
+        if {_lvl} is not set:
+            set {_lvl} to 1
+        if {_xp} is not set:
+            set {_xp} to 0
+        set {_need} to xpRequired({_lvl})
+        send "{@prefix} &eNivel: &a%{_lvl}% &7| &eXP: &a%{_xp}%&7/&a%{_need}%"
+  
+# Muestra informacion del arma en mano
+command /rpgweaponinfo:
+    aliases: /rpgwinfo
+    trigger:
+        set {_weapon} to player's tool
+        if {_weapon} is air:
+            send "{@prefix} &cDebes tener un arma en la mano."
+            stop
+        
+        set {_level} to get_weapon_level({_weapon})
+        set {_quality} to get_weapon_quality({_weapon})
+        
+        if {_level} is 0:
+            send "{@prefix} &cEsta arma no tiene nivel asignado."
+        else:
+            send "{@prefix} &eNivel del arma: &a%{_level}%"
+            send "{@prefix} &eCalidad: %{rpg.weapon.quality::%{_quality}%}%"
+            set {_damage} to calculate_weapon_damage({_quality}, {_level})
+            send "{@prefix} &eDaño total: &c%{_damage}% ❤"
+            
+            if {_quality} is "obsidiana":
+                set {_owner} to get_weapon_owner({_weapon})
+                if {_owner} is not "none":
+                    send "{@prefix} &ePropietario: &6%{_owner}%"
+
+  
+# Suma XP a un jugador
+command /rpgaddxp <player> <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpgaddxp <jugador> <cantidad> &7- Ejemplo: /rpgaddxp Steve 100
+    trigger:
+        if arg-2 <= 0:
+            send "{@prefix} &cLa cantidad de XP debe ser mayor a 0."
+            send "{@prefix} &eUso correcto: &a/rpgaddxp <jugador> <cantidad>"
+            stop
+        rpg_add_xp(arg-1, arg-2)
+        send "{@prefix} &aAñadido &e%arg-2% XP &aa &e%arg-1%&a."
+        if arg-1 is online:
+            send "{@prefix} &aHas recibido &e%arg-2% XP&a." to arg-1
+            send action bar "&a+%arg-2% XP" to arg-1
+  
+# Resta XP a un jugador
+command /rpgremovexp <player> <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpgremovexp <jugador> <cantidad> &7- Ejemplo: /rpgremovexp Steve 50
+    trigger:
+        if arg-2 <= 0:
+            send "{@prefix} &cLa cantidad de XP debe ser mayor a 0."
+            send "{@prefix} &eUso correcto: &a/rpgremovexp <jugador> <cantidad>"
+            stop
+        rpg_remove_xp(arg-1, arg-2)
+        send "{@prefix} &cRemovido &e%arg-2% XP &cde &e%arg-1%&c."
+        if arg-1 is online:
+            send "{@prefix} &cSe te han removido &e%arg-2% XP&c." to arg-1
+  
+# Ajusta el nivel de un jugador
+command /rpgsetlvl <player> <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpgsetlvl <jugador> <nivel> &7- Ejemplo: /rpgsetlvl Steve 25
+    trigger:
+        set {_l} to arg-2
+        if {_l} < 1:
+            send "{@prefix} &cEl nivel debe ser al menos 1."
+            send "{@prefix} &eUso correcto: &a/rpgsetlvl <jugador> <nivel>"
+            stop
+        if {_l} > {rpg.maxLevel}:
+            send "{@prefix} &cEl nivel no puede ser mayor a %{rpg.maxLevel}%."
+            send "{@prefix} &eUso correcto: &a/rpgsetlvl <jugador> <nivel>"
+            stop
+        
+        set {_id} to "%uuid of arg-1%"
+        
+        set {_spent_guerrero} to {rpg.skill.guerrero::%{_id}%}
+        set {_spent_tanque} to {rpg.skill.tanque::%{_id}%}
+        set {_spent_mago} to {rpg.skill.mago::%{_id}%}
+        set {_spent_healer} to {rpg.skill.healer::%{_id}%}
+        set {_spent_arquero} to {rpg.skill.arquero::%{_id}%}
+        
+        if {_spent_guerrero} is not set:
+            set {_spent_guerrero} to 0
+        if {_spent_tanque} is not set:
+            set {_spent_tanque} to 0
+        if {_spent_mago} is not set:
+            set {_spent_mago} to 0
+        if {_spent_healer} is not set:
+            set {_spent_healer} to 0
+        if {_spent_arquero} is not set:
+            set {_spent_arquero} to 0
+        
+        set {_total_spent} to {_spent_guerrero} + {_spent_tanque} + {_spent_mago} + {_spent_healer} + {_spent_arquero}
+        
+        set {rpg.level::%{_id}%} to {_l}
+        set {rpg.xp::%{_id}%} to 0
+        
+        set {_available_points} to {_l} - {_total_spent}
+        if {_available_points} < 0:
+            set {_available_points} to 0
+        
+        set {rpg.skillpoints::%{_id}%} to {_available_points}
+        
+        send "{@prefix} &aNivel de &e%arg-1% &aestablecido a &e%{_l}%&a."
+        send "{@prefix} &7Puntos disponibles: &e%{_available_points}% &7(Total: %{_l}%, Gastados: %{_total_spent}%)"
+        
+        if arg-1 is online:
+            rpg_update_bar(arg-1)
+            send "{@prefix} &aTu nivel ha sido establecido a &e%{_l}%&a." to arg-1
+            if {_available_points} > 0:
+                send "{@prefix} &aTienes &e%{_available_points}% puntos de habilidad &adisponibles. &7(/rpgclass)" to arg-1
+ 
+# Define el nivel maximo global
+command /rpgsetmaxlvl <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpgsetmaxlvl <nivel> &7- Ejemplo: /rpgsetmaxlvl 100
+    trigger:
+        set {_m} to arg-1
+        if {_m} < 1:
+            send "{@prefix} &cEl nivel máximo debe ser al menos 1."
+            send "{@prefix} &eUso correcto: &a/rpgsetmaxlvl <nivel>"
+            stop
+        set {rpg.maxLevel} to {_m}
+        send "{@prefix} &aNivel máximo establecido a &e%{rpg.maxLevel}%&a."
+        broadcast "{@prefix} &eEl nivel máximo del servidor ahora es &a%{rpg.maxLevel}%&e."
+  
+# Crea un arma personalizada para el ejecutor
+command /rpgcreateweapon <text> <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpgcreateweapon <calidad> <nivel> &7- Calidades: hierro, acero, mitril, obsidiana
+    trigger:
+        set {_quality} to lowercase arg-1
+        set {_level} to arg-2
+        
+        if {_quality} is not "hierro":
+            if {_quality} is not "acero":
+                if {_quality} is not "mitril":
+                    if {_quality} is not "obsidiana":
+                        send "{@prefix} &cCalidad inválida. Usa: &ehierro&c, &eacero&c, &emitril &co &eobsidiana&c."
+                        send "{@prefix} &eEjemplo: &a/rpgcreateweapon mitril 15"
+                        stop
+        
+        if {_level} < 1:
+            send "{@prefix} &cEl nivel debe estar entre 1 y 19."
+            stop
+        if {_level} > 19:
+            send "{@prefix} &cEl nivel debe estar entre 1 y 19."
+            stop
+        
+        set {_weapon} to create_weapon({_quality}, {_level}, netherite sword, player)
+        give {_weapon} to player
+        send "{@prefix} &aArma creada: %{rpg.weapon.quality::%{_quality}%}% &aEspada [Nivel %{_level}%]"
+  
+# Entrega un arma personalizada a otro jugador
+command /rpggiveweapon <player> <text> <number>:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    usage: {@prefix} &eUso: &a/rpggiveweapon <jugador> <calidad> <nivel> &7- Ejemplo: /rpggiveweapon Steve obsidiana 19
+    trigger:
+        set {_quality} to lowercase arg-2
+        set {_level} to arg-3
+        
+        if {_quality} is not "hierro":
+            if {_quality} is not "acero":
+                if {_quality} is not "mitril":
+                    if {_quality} is not "obsidiana":
+                        send "{@prefix} &cCalidad inválida. Usa: &ehierro&c, &eacero&c, &emitril &co &eobsidiana&c."
+                        send "{@prefix} &eEjemplo: &a/rpggiveweapon Steve obsidiana 19"
+                        stop
+        
+        if {_level} < 1:
+            send "{@prefix} &cEl nivel debe estar entre 1 y 19."
+            stop
+        if {_level} > 19:
+            send "{@prefix} &cEl nivel debe estar entre 1 y 19."
+            stop
+        
+        set {_weapon} to create_weapon({_quality}, {_level}, netherite sword, arg-1)
+        give {_weapon} to arg-1
+        
+        send "{@prefix} &aDado %{rpg.weapon.quality::%{_quality}%}% &aEspada [Nivel %{_level}%] a &e%arg-1%&a."
+        if arg-1 is online:
+            send "{@prefix} &aHas recibido un arma: %{rpg.weapon.quality::%{_quality}%}% &aEspada [Nivel %{_level}%]" to arg-1
+  
+# Actualiza las armas de todos los jugadores conectados
+command /rpgupdateweapons:
+    permission: rpg.admin
+    permission message: {@prefix} &cNo tienes permiso para usar este comando.
+    trigger:
+        send "{@prefix} &eActualizando todas las armas..."
+        loop all players:
+            update_player_weapons(loop-player)
+        send "{@prefix} &aActualización completada."
+
+  
+# Muestra resumen de comandos disponibles
+command /rpghelp:
+    trigger:
+        send "&6&m                    &r {@prefix} &6&m                    &r"
+        send ""
+        send "&e&lCOMANDOS DE JUGADOR:"
+        send "&a/rpg &7- Ver tu nivel y experiencia actual"
+        send ""
+        send "&e&lCOMANDOS DE ARMAS:"
+        send "&a/rpgweaponinfo &7- Ver información del arma en tu mano"
+        send ""
+        
+        if player has permission "rpg.admin":
+            send "&c&lCOMANDOS DE ADMINISTRADOR:"
+            send ""
+            send "&eNiveles de Jugador:"
+            send "&a/rpgaddxp <jugador> ntidaidad> &7- Añadir XP a un jugador"
+            send "&a/rpgremovexp <jugador> <cantidad> &7- Remover XP de un jugador"
+            send "&a/rpgsetlvl <jugador> <nivel> &7- Establecer nivel de un jugador"
+            send "&a/rpgsetmaxlvl <nivel> &7- Cambiar nivel máximo del servidor"
+            send ""
+            send "&eArmas Personalizadas:"
+            send "&a/rpgcreateweapon <calidad> <nivel>"
+            send "&7  └─ Crear un arma para ti mismo"
+            send "&a/rpggiveweapon <jugador> <calidad> <nivel>"
+            send "&7  └─ Dar un arma a otro jugador"
+            send "&a/rpgupdateweapons"
+            send "&7  └─ Actualizar todas las armas manualmente"
+            send ""
+            send "&eCalidades disponibles:"
+            send "&7• &7hierro &8- Básico (8 de daño base)"
+            send "&7• &9acero &8- Raro (12 de daño base)"
+            send "&7• &5mitril &8- Épico (18 de daño base)"
+            send "&x&F&F&6&B&0&0• &x&F&F&6&B&0&0obsidiana &8- Legendario (25 de daño base) &c[Vinculado]"
+            send ""
+            send "&eEjemplos:"
+            send "&a/rpgaddxp Steve 100 &7- Da 100 XP a Steve"
+            send "&a/rpgcreateweapon obsidiana 19 &7- Crea espada legendaria nivel 19"
+            send "&a/rpggiveweapon Steve acero 10 &7- Da espada de acero nivel 10 a Steve"
+            send ""
+            send "&eClases y Habilidades:"
+            send "&a/rpggiveskillpoint <jugador> <cantidad>"
+            send "&7  └─ Dar puntos de habilidad a un jugador"
+            send "&a/rpgresetclass <jugador>"
+            send "&7  └─ Resetear las habilidades de un jugador"
+            send "&a/rpgclassinfo <jugador>"
+            send "&7  └─ Ver información de clase de un jugador"
+            send ""
+
+        
+        send "&e&lSISTEMA DE NIVELES:"
+        send "&7• Gana XP matando mobs y minando minerales"
+        send "&7• La XP requerida aumenta con cada nivel"
+        send "&7• Tu nivel actual se muestra en la barra de XP"
+        send ""
+        send "&e&lSISTEMA DE ARMAS:"
+        send "&7• Cada nivel de arma aumenta el daño en 18%%"
+        send "&7• Necesitas nivel de jugador igual o mayor al del arma"
+        send "&7• Las armas se actualizan automáticamente al reiniciar"
+        send "&7• Las armas &6legendarias &7están vinculadas a su propietario"
+        send "&7• Todas las armas son &airrompibles"
+        send ""
+        send "&6&m                                              &r"
+        send ""
+        send "&e&lCOMANDOS DE CLASES:"
+        send "&a/rpgclass &7- Ver y mejorar tus habilidades de clase"
+        send ""
